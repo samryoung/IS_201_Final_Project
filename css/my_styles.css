@@ -1,0 +1,14 @@
+.my_serif_text{
+    font-family: serif;
+}
+
+.my_color_2{
+    color:rgb(140, 140, 140)
+}
+
+.my_color{
+    color: rgba(24, 24, 197, 0.795) !important;
+}
+.navbar {
+    background-color: rgba(24, 24, 197, 0.795) !important; /* Use !important to ensure override */
+}
