@@ -3,223 +3,277 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unicycler Game</title>
+    <title>Unicycling Man Game</title>
     <style>
-        body {
-            background-color: #f0f0f0; /* Light grey background */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
+      body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
+    background-image: url('../assets/img/unicycle_man.jpg'); /* Corrected path */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    font-family: Arial, sans-serif;
         }
-        canvas {
-            background-color: #d3d3d3; /* Darker grey for the game area */
-            border: 1px solid #000;
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.8); /* Semi-transparent white overlay for readability */
+            padding: 10px;
+        }
+        #gameCanvas {
+            border: 1px solid black;
+            background-color: rgba(255, 255, 255, 0.9); /* Slightly transparent canvas */
+        }
+        #textAbove, #textBelow {
+            background-color: rgba(255, 255, 255, 0.9); /* Semi-transparent text boxes */
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            width: calc(100% - 40px);
+            max-width: 1180px;
+            text-align: center;
+            font-size: 18px;
         }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="800" height="200"></canvas>
+    <div id="gameContainer">
+        <div id="textAbove">Welcome to the Unicycling Man Game! Press Space to jump over benches and avoid frisbees.</div>
+        <canvas id="gameCanvas"></canvas>
+        <div id="textBelow">High scores are saved. Can you beat the record?
+            <br> <a href="../pages/scratch.html">Return to unicycle info page?</a>
+
+        </div>
+    </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Game constants
-        const GAME_WIDTH = 800;
-        const GAME_HEIGHT = 200;
-        const GROUND_HEIGHT = 20;
-        const UNICYCLER_WIDTH = 30;
-        const UNICYCLER_HEIGHT = 50;
-        const JUMP_FORCE = -10;
-        const GRAVITY = 0.5;
-        const OBSTACLE_MIN_WIDTH = 10;
-        const OBSTACLE_MAX_WIDTH = 50;
-        const OBSTACLE_MIN_HEIGHT = 20;
-        const OBSTACLE_MAX_HEIGHT = 50;
-        const OBSTACLE_MIN_GAP = 150;
-        const OBSTACLE_MAX_GAP = 300;
-        const FRISBEE_SIZE = 20;
-        const FRISBEE_MIN_HEIGHT = 50;
-        const FRISBEE_MAX_HEIGHT = 150;
+        // Set initial canvas size
+        function resizeCanvas() {
+            const maxWidth = 1200;
+            const minWidth = 400;
+            let newWidth = window.innerWidth - 20; // 10px margin on each side
+            if (newWidth > maxWidth) newWidth = maxWidth;
+            if (newWidth < minWidth) newWidth = minWidth;
+            canvas.width = newWidth;
+            canvas.height = 200;
+        }
 
-        // Game state variables
-        let unicycler = {
+        // Call on load and window resize
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Game variables
+        const groundY = 180;
+        let character = {
             x: 50,
-            y: GAME_HEIGHT - GROUND_HEIGHT - UNICYCLER_HEIGHT,
+            y: groundY,
+            width: 30,
+            height: 30,
             vy: 0,
-            jumping: false
+            gravity: 0.5,
+            jumpStrength: -12,
+            isJumping: false
         };
         let obstacles = [];
         let score = 0;
-        let highScore = 0;
-        let gameSpeed = 5;
+        let highScore = localStorage.getItem('highScore') ? parseInt(localStorage.getItem('highScore')) : 0;
         let isGameOver = false;
-        let animationFrame = 0;
-        let distanceSinceLastObstacle = 0;
-        let nextObstacleGap = OBSTACLE_MIN_GAP + Math.random() * (OBSTACLE_MAX_GAP - OBSTACLE_MIN_GAP);
+        let obstacleSpeed = 5;
+        let obstacleFrequency = 100;
+        let lastObstacleX = canvas.width;
 
-        // Obstacle constructor
-        function Obstacle(x, width, height, type) {
-            this.x = x;
-            this.y = GAME_HEIGHT - GROUND_HEIGHT - height;
-            this.width = width;
-            this.height = height;
-            this.type = type;
-        }
-
-        Obstacle.prototype.draw = function() {
-            if (this.type === 'frisbee') {
-                ctx.fillStyle = 'yellow';
-                ctx.beginPath();
-                ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, 0, Math.PI * 2);
-                ctx.fill();
-            } else {
-                ctx.fillStyle = this.type === 'curb' ? '#808080' : '#a0a0a0';
-                ctx.fillRect(this.x, this.y, this.width, this.height);
-            }
-        };
-
-        Obstacle.prototype.update = function() {
-            this.x -= gameSpeed;
-        };
-
-        // Spawn a new obstacle
-        function spawnObstacle() {
-            const type = Math.random() < 0.2 ? 'frisbee' : Math.random() < 0.5 ? 'curb' : 'can';
-            let width, height, x;
-            if (type === 'frisbee') {
-                width = FRISBEE_SIZE;
-                height = FRISBEE_SIZE;
-                x = GAME_WIDTH;
-                const flyHeight = FRISBEE_MIN_HEIGHT + Math.random() * (FRISBEE_MAX_HEIGHT - FRISBEE_MIN_HEIGHT);
-                obstacles.push(new Obstacle(x, width, height, type));
-                obstacles[obstacles.length - 1].y = flyHeight;
-            } else {
-                width = OBSTACLE_MIN_WIDTH + Math.random() * (OBSTACLE_MAX_WIDTH - OBSTACLE_MIN_WIDTH);
-                height = OBSTACLE_MIN_HEIGHT + Math.random() * (OBSTACLE_MAX_HEIGHT - OBSTACLE_MIN_HEIGHT);
-                x = GAME_WIDTH;
-                obstacles.push(new Obstacle(x, width, height, type));
-            }
-        }
-
-        // Draw the unicycler character
-        function drawUnicycler() {
-            const yOffset = unicycler.jumping ? 0 : Math.sin(animationFrame * 0.1) * 2;
-            ctx.fillStyle = 'red'; // Helmet
-            ctx.fillRect(unicycler.x + 10, unicycler.y + yOffset, 10, 5);
-            ctx.fillStyle = 'white'; // Shirt
-            ctx.fillRect(unicycler.x + 5, unicycler.y + 5 + yOffset, 20, 15);
-            ctx.fillStyle = 'blue'; // Jeans
-            ctx.fillRect(unicycler.x + 5, unicycler.y + 20 + yOffset, 20, 20);
-            ctx.fillStyle = 'black'; // Unicycle frame
-            ctx.fillRect(unicycler.x + 12, unicycler.y + 40 + yOffset, 6, 10);
-            ctx.beginPath(); // Unicycle wheel
-            ctx.arc(unicycler.x + 15, unicycler.y + 55 + yOffset, 5, 0, Math.PI * 2);
+        // Draw the unicycling man with red helmet
+        function drawCharacter() {
+            // Head
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(character.x + 15, character.y - 15, 8, 0, Math.PI * 2);
+            ctx.fill();
+            // Body
+            ctx.fillRect(character.x + 12, character.y - 10, 6, 15);
+            // Unicycle wheel
+            ctx.beginPath();
+            ctx.arc(character.x + 15, character.y + 20, 8, 0, Math.PI * 2);
+            ctx.fill();
+            // Unicycle frame
+            ctx.fillRect(character.x + 14, character.y + 5, 2, 15);
+              // Red helmet (semi-circle on top of head)
+              ctx.fillStyle = 'Blue';
+            ctx.beginPath();
+            ctx.arc(character.x + 15, character.y - 15, 10, Math.PI, 2 * Math.PI);
             ctx.fill();
         }
 
-        // Update game state
-        function update() {
-            if (!isGameOver) {
-                animationFrame++;
-
-                // Update unicycler position
-                unicycler.vy += GRAVITY;
-                unicycler.y += unicycler.vy;
-                if (unicycler.y > GAME_HEIGHT - GROUND_HEIGHT - UNICYCLER_HEIGHT) {
-                    unicycler.y = GAME_HEIGHT - GROUND_HEIGHT - UNICYCLER_HEIGHT;
-                    unicycler.vy = 0;
-                    unicycler.jumping = false;
+        // Draw obstacles
+        function drawObstacles() {
+            obstacles.forEach(obstacle => {
+                if (obstacle.type === 'bench') {
+                    ctx.fillStyle = 'brown';
+                    // Seat
+                    ctx.fillRect(obstacle.x, obstacle.y + 10, obstacle.width, 10);
+                    // Backrest
+                    ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, 10);
+                    // Legs
+                    ctx.fillRect(obstacle.x + 5, obstacle.y + 20, 5, 10);
+                    ctx.fillRect(obstacle.x + obstacle.width - 10, obstacle.y + 20, 5, 10);
+                } else if (obstacle.type === 'frisbee') {
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
                 }
+            });
+        }
 
-                // Update obstacles
-                obstacles.forEach(obstacle => obstacle.update());
-                obstacles = obstacles.filter(obstacle => obstacle.x + obstacle.width > 0);
-
-                // Spawn obstacles based on distance
-                distanceSinceLastObstacle += gameSpeed;
-                if (distanceSinceLastObstacle > nextObstacleGap) {
-                    spawnObstacle();
-                    distanceSinceLastObstacle = 0;
-                    nextObstacleGap = OBSTACLE_MIN_GAP + Math.random() * (OBSTACLE_MAX_GAP - OBSTACLE_MIN_GAP);
+        // Update character position
+        function updateCharacter() {
+            if (character.isJumping) {
+                character.vy += character.gravity;
+                character.y += character.vy;
+                if (character.y >= groundY) {
+                    character.y = groundY;
+                    character.vy = 0;
+                    character.isJumping = false;
                 }
+            }
+        }
 
-                // Collision detection
-                obstacles.forEach(obstacle => {
-                    if (
-                        unicycler.x + UNICYCLER_WIDTH > obstacle.x &&
-                        unicycler.x < obstacle.x + obstacle.width &&
-                        unicycler.y + UNICYCLER_HEIGHT > obstacle.y &&
-                        unicycler.y < obstacle.y + obstacle.height
-                    ) {
+        // Update obstacles
+        function updateObstacles() {
+            obstacles.forEach(obstacle => {
+                obstacle.x -= obstacleSpeed;
+            });
+            obstacles = obstacles.filter(obstacle => obstacle.x + obstacle.width > 0);
+        }
+
+        // Generate obstacles with spacing
+        function generateObstacles() {
+            if (isGameOver) return;
+            if (Math.random() < 1 / obstacleFrequency && lastObstacleX < canvas.width - 200) {
+                let type = Math.random() < 0.5 ? 'bench' : 'frisbee';
+                let obstacle;
+                if (type === 'bench') {
+                    obstacle = {
+                        type: 'bench',
+                        x: canvas.width,
+                        y: groundY - 30,
+                        width: 40,
+                        height: 30
+                    };
+                } else {
+                    obstacle = {
+                        type: 'frisbee',
+                        x: canvas.width,
+                        y: 100,
+                        width: 30,
+                        height: 8
+                    };
+                }
+                obstacles.push(obstacle);
+                lastObstacleX = canvas.width;
+            }
+            lastObstacleX -= obstacleSpeed;
+        }
+
+        // Collision detection
+        function checkCollisions() {
+            obstacles.forEach(obstacle => {
+                if (obstacle.type === 'bench') {
+                    if (character.x + character.width > obstacle.x &&
+                        character.x < obstacle.x + obstacle.width &&
+                        character.y + character.height > obstacle.y) {
                         isGameOver = true;
-                        if (score > highScore) highScore = score;
                     }
-                });
-
-                // Update score and speed
-                score += 1;
-                gameSpeed += 0.001; // Gradual speed increase
-            }
-        }
-
-        // Render the game
-        function draw() {
-            ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-
-            // Draw ground
-            ctx.fillStyle = '#a0a0a0';
-            ctx.fillRect(0, GAME_HEIGHT - GROUND_HEIGHT, GAME_WIDTH, GROUND_HEIGHT);
-
-            // Draw unicycler and obstacles
-            drawUnicycler();
-            obstacles.forEach(obstacle => obstacle.draw());
-
-            // Draw scores
-            ctx.fillStyle = 'black';
-            ctx.font = '20px Arial';
-            ctx.fillText(`Score: ${score}`, 10, 30);
-            ctx.fillText(`High Score: ${highScore}`, 10, 60);
-
-            // Game over screen
-            if (isGameOver) {
-                ctx.fillStyle = 'red';
-                ctx.font = '40px Arial';
-                ctx.fillText('Game Over', GAME_WIDTH / 2 - 100, GAME_HEIGHT / 2);
-            }
-        }
-
-        // Game loop
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
+                } else if (obstacle.type === 'frisbee') {
+                    if (character.x + character.width > obstacle.x &&
+                        character.x < obstacle.x + obstacle.width &&
+                        character.y < obstacle.y + obstacle.height) {
+                        isGameOver = true;
+                    }
+                }
+            });
         }
 
         // Handle user input
-        document.addEventListener('keydown', (event) => {
-            if (event.code === 'Space') {
-                if (!isGameOver && !unicycler.jumping) {
-                    unicycler.vy = JUMP_FORCE;
-                    unicycler.jumping = true;
-                } else if (isGameOver) {
-                    // Restart game
-                    obstacles = [];
-                    score = 0;
-                    gameSpeed = 5;
-                    unicycler.y = GAME_HEIGHT - GROUND_HEIGHT - UNICYCLER_HEIGHT;
-                    unicycler.vy = 0;
-                    unicycler.jumping = false;
-                    isGameOver = false;
-                    nextObstacleGap = OBSTACLE_MIN_GAP + Math.random() * (OBSTACLE_MAX_GAP - OBSTACLE_MIN_GAP);
-                    distanceSinceLastObstacle = 0;
-                }
+        document.addEventListener('keydown', function(event) {
+            if (event.code === 'Space' && !character.isJumping && !isGameOver) {
+                character.vy = character.jumpStrength;
+                character.isJumping = true;
+            }
+            if (isGameOver && event.code === 'Space') {
+                init();
             }
         });
 
+        // Main game loop
+        function gameLoop() {
+            if (isGameOver) {
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('highScore', highScore);
+                }
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+                ctx.font = '30px Arial';
+                ctx.fillText('Game Over! Press Space to Restart', canvas.width / 2 - 200, 100);
+                ctx.fillText('Score: ' + score, canvas.width / 2 - 50, 140);
+                ctx.fillText('High Score: ' + highScore, canvas.width / 2 - 70, 180);
+                return;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw ground
+            ctx.fillStyle = 'gray';
+            ctx.fillRect(0, groundY, canvas.width, 20);
+
+            drawCharacter();
+            drawObstacles();
+            updateCharacter();
+            updateObstacles();
+            generateObstacles();
+            checkCollisions();
+
+            // Update score
+            score++;
+            ctx.fillStyle = 'black';
+            ctx.font = '20px Arial';
+            ctx.fillText('Score: ' + score, 10, 30);
+            ctx.fillText('High Score: ' + highScore, 10, 50);
+
+            // Increase difficulty
+            if (score % 1000 === 0) {
+                obstacleSpeed += 1;
+                obstacleFrequency -= 10;
+                if (obstacleFrequency < 20) obstacleFrequency = 20;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize game
+        function init() {
+            character.y = groundY;
+            character.vy = 0;
+            character.isJumping = false;
+            obstacles = [];
+            score = 0;
+            isGameOver = false;
+            obstacleSpeed = 5;
+            obstacleFrequency = 100;
+            lastObstacleX = canvas.width;
+            gameLoop();
+        }
+
         // Start the game
-        gameLoop();
+        init();
     </script>
 </body>
 </html>

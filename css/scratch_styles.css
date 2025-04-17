@@ -1,0 +1,55 @@
+body {
+    background-color: rgba(155, 220, 233, 0.438);
+}
+
+.heading {
+    color: rgb(54, 83, 88);
+    text-decoration: underline;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.text {
+    color:  rgb(69, 104, 111);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+.bullets {
+    text-decoration: dashed;
+    font-weight: bolder;
+    color:  rgba(54, 83, 88, 0.763);
+}
+.story {
+    font-weight: bold;
+    color:   rgb(241, 131, 41); !important
+}
+
+.common_div {
+    border: 2px solid rgb(77, 77, 77);
+    position: absolute;
+    overflow: auto;
+    padding: 3px;
+}
+.header_div{
+    top: 5px;
+    left: 5px;
+    right: 5px;
+    height: 425px;
+    text-align: center;
+    line-height: 30px;
+    font-size: 20px;
+}
+
+.left_div {
+    top: 441px;
+    left: 5px;
+    width: 150px;
+    height: 900px;
+    bottom: 216px;
+}
+
+.main_div {
+    top: 441px;
+    left: 166px;
+    right: 5px;
+    height: 900px;
+    bottom: 10px;
+}
